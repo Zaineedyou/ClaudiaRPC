@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClaudiaRPC</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-main">
+                <img src="logo.svg" alt="Ferris the Crab" class="logo">
+                <div class="header-text">
+                    <h1>ClaudiaRPC</h1>
+                    <p>Custom Rich Presence via Gateway</p>
+                </div>
+            </div>
+            <div id="connection-status" class="status-indicator">
+                <span class="status-dot"></span>
+                <span class="status-text">Disconnected</span>
+            </div>
+        </header>
+
+        <main>
+            <div class="editor">
+                <div class="profile-manager">
+                    <label>PROFILES</label>
+                    <div class="profile-row">
+                        <select id="profile-select"></select>
+                        <button id="save-profile-btn" class="btn-secondary">Save</button>
+                        <button id="delete-profile-btn" class="btn-danger">Del</button>
+                        <button id="export-profile-btn" class="btn-secondary" title="Export all profiles">↑</button>
+                        <label class="btn-secondary btn-import" title="Import profiles">↓<input type="file" id="import-file" accept=".json" style="display:none"></label>
+                    </div>
+                </div>
+
+                <div id="rpc-form">
+                    <div class="form-group">
+                        <label>User Token</label>
+                        <input type="password" id="token" placeholder="Discord user token">
+                    </div>
+                    <div class="grid">
+                        <div class="form-group">
+                            <label>Application Name</label>
+                            <input type="text" id="app_name" placeholder="ClaudiaRPC">
+                        </div>
+                        <div class="form-group">
+                            <label>Activity Type</label>
+                            <select id="type">
+                                <option value="0">Playing</option>
+                                <option value="1">Streaming</option>
+                                <option value="2">Listening</option>
+                                <option value="3">Watching</option>
+                                <option value="5">Competing</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Application ID</label>
+                        <input type="text" id="client_id" placeholder="1234567890">
+                    </div>
+                    <div class="grid">
+                        <div class="form-group">
+                            <label class="label-with-counter">
+                                Details
+                                <span class="char-counter" id="counter-details">0/128</span>
+                            </label>
+                            <input type="text" id="details" placeholder="What you're doing" maxlength="128">
+                        </div>
+                        <div class="form-group">
+                            <label class="label-with-counter">
+                                State
+                                <span class="char-counter" id="counter-state">0/128</span>
+                            </label>
+                            <input type="text" id="state" placeholder="Current state" maxlength="128">
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="form-group">
+                            <label>Large Image URL</label>
+                            <div class="input-with-btn">
+                                <input type="text" id="large_image" placeholder="https://i.imgur.com/...">
+                                <button class="btn-upload" data-target="large_image">Upload</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Large Image Text</label>
+                            <input type="text" id="large_text" placeholder="Hover text">
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="form-group">
+                            <label>Small Image URL</label>
+                            <div class="input-with-btn">
+                                <input type="text" id="small_image" placeholder="https://i.imgur.com/...">
+                                <button class="btn-upload" data-target="small_image">Upload</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Small Image Text</label>
+                            <input type="text" id="small_text" placeholder="Hover text">
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="form-group">
+                            <label>Start Timestamp</label>
+                            <input type="datetime-local" id="timestamp_start">
+                        </div>
+                        <div class="form-group">
+                            <label>End Timestamp</label>
+                            <input type="datetime-local" id="timestamp_end">
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="form-group">
+                            <label>Button 1 Label</label>
+                            <input type="text" id="button1_label" placeholder="Visit Website">
+                        </div>
+                        <div class="form-group">
+                            <label>Button 1 URL</label>
+                            <input type="text" id="button1_url" placeholder="https://...">
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="form-group">
+                            <label>Button 2 Label</label>
+                            <input type="text" id="button2_label" placeholder="Join Server">
+                        </div>
+                        <div class="form-group">
+                            <label>Button 2 URL</label>
+                            <input type="text" id="button2_url" placeholder="https://...">
+                        </div>
+                    </div>
+
+                    <div id="status-message" class="status-message"></div>
+
+                    <div class="actions">
+                        <button id="start-btn" class="btn-primary">Start RPC</button>
+                        <button id="update-btn" class="btn-secondary">Update</button>
+                        <button id="stop-btn" class="btn-danger">Stop</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="preview">
+                <h2>Live Preview</h2>
+                <div class="discord-card">
+                    <div class="card-header" id="preview-header">PLAYING A GAME</div>
+                    <div class="card-body">
+                        <div class="large-img-container">
+                            <img id="preview-large-img" src="" alt="">
+                            <img id="preview-small-img" src="" alt="" style="display:none">
+                        </div>
+                        <div class="content">
+                            <div class="app-name" id="preview-app-name">ClaudiaRPC</div>
+                            <div class="details" id="preview-details">Rich Presence Details</div>
+                            <div class="state" id="preview-state">State Info</div>
+                            <div class="timestamp" id="preview-timestamp" style="display:none"></div>
+                        </div>
+                    </div>
+                    <div class="buttons-container" id="preview-buttons"></div>
+                </div>
+            </div>
+        </main>
+
+        <div class="rpc-status-grid">
+            <div class="status-card">
+                <div class="status-card-label">RPC STATUS</div>
+                <div class="status-card-value" id="stat-status">
+                    <span class="status-dot-sm disconnected"></span>
+                    <span id="stat-status-text">Disconnected</span>
+                </div>
+            </div>
+            <div class="status-card">
+                <div class="status-card-label">UPTIME</div>
+                <div class="status-card-value mono" id="stat-uptime">--:--:--</div>
+            </div>
+            <div class="status-card">
+                <div class="status-card-label">ACTIVITY</div>
+                <div class="status-card-value mono" id="stat-activity">—</div>
+            </div>
+            <div class="status-card">
+                <div class="status-card-label">GATEWAY</div>
+                <div class="status-card-value mono" id="stat-gateway">discord.gg</div>
+            </div>
+        </div>
+
+        <footer>
+            <div class="credits">
+                <div class="social-links">
+                    <a href="https://github.com/Zaineedyou" target="_blank">
+                        <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/github.svg" alt="GitHub">
+                    </a>
+                    <a href="https://instagram.com/dear.claudiaaa" target="_blank">
+                        <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/instagram.svg" alt="Instagram">
+                    </a>
+                    <a href="https://discord.com/users/1133016364857180301" target="_blank">
+                        <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/discord.svg" alt="Discord">
+                    </a>
+                </div>
+                <p>Developed By Claudia 🩷 &nbsp;·&nbsp; <span class="version">v1.0.0</span></p>
+            </div>
+        </footer>
+    </div>
+    <script src="/app.js"></script>
+</body>
+</html>

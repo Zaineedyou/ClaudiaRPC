@@ -1,0 +1,12 @@
+# Binary
+ClaudiaRPC
+ClaudiaRPC.exe
+
+# Profiles and temporary files
+profiles.json
+last_profile.txt
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
