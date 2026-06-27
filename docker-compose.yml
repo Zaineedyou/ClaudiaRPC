@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  claudia-rpc:
+    build: .
+    ports:
+      - "8080:8080"
+    restart: always
+    volumes:
+      - ./data:/root/data # For persistent data if needed
