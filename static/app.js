@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const statusMsg = document.getElementById('status-message')
-    const inputs = document.querySelectorAll('#rpc-form input, #rpc-form select')
+    const statusMsg  = document.getElementById('status-message')
+    const inputs     = document.querySelectorAll('#rpc-form input, #rpc-form select')
     const profileSelect = document.getElementById('profile-select')
 
     const pHeader    = document.getElementById('preview-header')
@@ -12,8 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const pTimestamp = document.getElementById('preview-timestamp')
     const pButtons   = document.getElementById('preview-buttons')
 
-    const statusDot     = document.querySelector('.status-dot')
-    const statusText    = document.querySelector('.status-text')
+    const statusDot      = document.querySelector('.status-dot')
+    const statusText     = document.querySelector('.status-text')
     const statStatusText = document.getElementById('stat-status-text')
     const statStatusDot  = document.querySelector('#stat-status .status-dot-sm')
     const statActivity   = document.getElementById('stat-activity')
@@ -24,9 +24,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let uptimeInterval = null
     let rpcStartTime   = null
 
-    // ── Token restore ──────────────────────────────────────────
-    const savedToken = sessionStorage.getItem('discord_token')
-    if (savedToken) document.getElementById('token').value = savedToken
+    // ── localStorage profile helpers ───────────────────────────
+    const LS_KEY = 'claudiarpc_profiles'
+    const LS_LAST = 'claudiarpc_last_profile'
+
+    const lsGetProfiles = () => {
+        try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}') } catch { return {} }
+    }
+    const lsSaveProfiles = (profiles) => {
+        localStorage.setItem(LS_KEY, JSON.stringify(profiles))
+    }
+    const lsGetLast = () => localStorage.getItem(LS_LAST) || ''
+    const lsSetLast = (name) => localStorage.setItem(LS_LAST, name)
 
     // ── Uptime ─────────────────────────────────────────────────
     const formatUptime = (ms) => {
@@ -49,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopUptime = () => {
         clearInterval(uptimeInterval)
         rpcStartTime = null
-        if (statUptime) statUptime.textContent = '--:--:--'
+        if (statUptime)   statUptime.textContent  = '--:--:--'
         if (statActivity) statActivity.textContent = '\u2014'
     }
 
@@ -113,12 +122,14 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { statusMsg.style.display = 'none' }, 8000)
     }
 
-    // ── Connection status polling ──────────────────────────────
+    // ── Connection status polling (token via header) ────────────
     const updateConnectionStatus = async () => {
         const token = document.getElementById('token').value || activeToken
         if (!token) return
         try {
-            const res  = await fetch(`/api/rpc/status?token=${encodeURIComponent(token)}`)
+            const res  = await fetch('/api/rpc/status', {
+                headers: { 'X-Discord-Token': token }
+            })
             const data = await res.json()
             const cls  = data.status.toLowerCase().replace('...', '')
             statusText.textContent = data.status
@@ -183,48 +194,43 @@ document.addEventListener('DOMContentLoaded', () => {
         ;[['button1_label','button1_url'],['button2_label','button2_url']].forEach(([lk,uk]) => {
             if (!data[lk]) return
             const a = document.createElement('a')
-            a.className   = 'preview-btn'
+            a.className = 'preview-btn'
             a.textContent = data[lk]
             if (data[uk]) { a.href = data[uk]; a.target = '_blank' }
             pButtons.appendChild(a)
         })
     }
 
-    // ── Profiles ───────────────────────────────────────────────
-    const loadProfiles = async () => {
-        try {
-            const res      = await fetch('/api/profiles')
-            const profiles = await res.json()
-            const current  = profileSelect.value
-            profileSelect.innerHTML = '<option value="">-- Select Profile --</option>'
-            Object.keys(profiles).forEach(name => {
-                const opt = document.createElement('option')
-                opt.value = opt.textContent = name
-                profileSelect.appendChild(opt)
-            })
-            if (current) profileSelect.value = current
-            return profiles
-        } catch { return {} }
+    // ── Profile (localStorage) ─────────────────────────────────
+    const loadProfiles = () => {
+        const profiles = lsGetProfiles()
+        const current  = profileSelect.value
+        profileSelect.innerHTML = '<option value="">-- Select Profile --</option>'
+        Object.keys(profiles).sort().forEach(name => {
+            const opt = document.createElement('option')
+            opt.value = opt.textContent = name
+            profileSelect.appendChild(opt)
+        })
+        if (current && profileSelect.querySelector(`option[value="${CSS.escape(current)}"]`)) {
+            profileSelect.value = current
+        }
+        return profiles
     }
 
     // Quick switch
-    profileSelect.addEventListener('change', async () => {
+    profileSelect.addEventListener('change', () => {
         const name = profileSelect.value
         if (!name) return
-        const profiles = await loadProfiles()
+        const profiles = lsGetProfiles()
         if (profiles[name]) {
             fillForm(profiles[name])
-            fetch('/api/profiles/last', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
-            }).catch(() => {})
+            lsSetLast(name)
         }
     })
 
     inputs.forEach(input => input.addEventListener('input', updatePreview))
 
-    // ── Validation warning ────────────────────────────────────
+    // ── Validation warning ─────────────────────────────────────
     const validateWarnings = (data) => {
         const w = []
         if (!data.client_id || !data.client_id.trim()) w.push('Application ID kosong')
@@ -235,11 +241,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return w
     }
 
-    // ── Start RPC ─────────────────────────────────────────────
+    // ── Start RPC ──────────────────────────────────────────────
     let warnConfirmed = false
     document.getElementById('start-btn').addEventListener('click', async () => {
         const data  = getFormData()
-        sessionStorage.setItem('discord_token', data.token)
         activeToken = data.token
 
         const warnings = validateWarnings(data)
@@ -251,7 +256,11 @@ document.addEventListener('DOMContentLoaded', () => {
         warnConfirmed = false
 
         try {
-            const res    = await fetch('/api/rpc/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) })
+            const res    = await fetch('/api/rpc/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
             const result = await res.json()
             if (result.error) throw new Error(result.error)
             showStatus('RPC Started!')
@@ -267,7 +276,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!data.token) { showStatus('Token kosong.', true); return }
         activeToken = data.token
         try {
-            const res    = await fetch('/api/rpc/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) })
+            const res    = await fetch('/api/rpc/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
             const result = await res.json()
             if (result.error) throw new Error(result.error)
             showStatus('RPC Updated!')
@@ -279,7 +292,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const token = document.getElementById('token').value || activeToken
         if (!token) { showStatus('Token kosong.', true); return }
         try {
-            const res    = await fetch('/api/rpc/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token }) })
+            const res    = await fetch('/api/rpc/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token })
+            })
             const result = await res.json()
             if (result.error) throw new Error(result.error)
             showStatus('RPC Stopped.')
@@ -292,44 +309,43 @@ document.addEventListener('DOMContentLoaded', () => {
     })
 
     // ── Save profile ───────────────────────────────────────────
-    document.getElementById('save-profile-btn').addEventListener('click', async () => {
+    document.getElementById('save-profile-btn').addEventListener('click', () => {
         const name = prompt('Nama profile:')
         if (!name || !name.trim()) return
-        const data = getFormData()
-        try {
-            const res    = await fetch('/api/profiles', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name: name.trim(), data }) })
-            const result = await res.json()
-            if (result.error) throw new Error(result.error)
-            showStatus(`Profile "${name.trim()}" disimpan.`)
-            await loadProfiles()
-            profileSelect.value = name.trim()
-        } catch (err) { showStatus(err.message, true) }
+        const data     = getFormData()
+        // Jangan simpen token di profile
+        delete data.token
+        const profiles = lsGetProfiles()
+        profiles[name.trim()] = data
+        lsSaveProfiles(profiles)
+        showStatus(`Profile "${name.trim()}" disimpan.`)
+        loadProfiles()
+        profileSelect.value = name.trim()
+        lsSetLast(name.trim())
     })
 
     // ── Delete profile ─────────────────────────────────────────
-    document.getElementById('delete-profile-btn').addEventListener('click', async () => {
+    document.getElementById('delete-profile-btn').addEventListener('click', () => {
         const name = profileSelect.value
         if (!name) { showStatus('Pilih profile dulu.', true); return }
         if (!confirm(`Hapus profile "${name}"?`)) return
-        try {
-            await fetch(`/api/profiles/${encodeURIComponent(name)}`, { method:'DELETE' })
-            showStatus(`Profile "${name}" dihapus.`)
-            await loadProfiles()
-        } catch (err) { showStatus(err.message, true) }
+        const profiles = lsGetProfiles()
+        delete profiles[name]
+        lsSaveProfiles(profiles)
+        if (lsGetLast() === name) lsSetLast('')
+        showStatus(`Profile "${name}" dihapus.`)
+        loadProfiles()
     })
 
     // ── Export profiles ────────────────────────────────────────
-    document.getElementById('export-profile-btn').addEventListener('click', async () => {
-        try {
-            const res      = await fetch('/api/profiles')
-            const profiles = await res.json()
-            const blob = new Blob([JSON.stringify(profiles, null, 2)], { type: 'application/json' })
-            const a = document.createElement('a')
-            a.href = URL.createObjectURL(blob)
-            a.download = 'claudiarpc_profiles.json'
-            a.click()
-            showStatus('Profiles berhasil di-export!')
-        } catch (err) { showStatus('Export gagal: ' + err.message, true) }
+    document.getElementById('export-profile-btn').addEventListener('click', () => {
+        const profiles = lsGetProfiles()
+        const blob = new Blob([JSON.stringify(profiles, null, 2)], { type: 'application/json' })
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = 'claudiarpc_profiles.json'
+        a.click()
+        showStatus('Profiles berhasil di-export!')
     })
 
     // ── Import profiles ────────────────────────────────────────
@@ -338,12 +354,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!file) return
         try {
             const text     = await file.text()
-            const profiles = JSON.parse(text)
-            for (const [name, data] of Object.entries(profiles)) {
-                await fetch('/api/profiles', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, data }) })
-            }
-            showStatus(`${Object.keys(profiles).length} profile berhasil di-import!`)
-            await loadProfiles()
+            const imported = JSON.parse(text)
+            const profiles = lsGetProfiles()
+            Object.assign(profiles, imported)
+            lsSaveProfiles(profiles)
+            showStatus(`${Object.keys(imported).length} profile berhasil di-import!`)
+            loadProfiles()
         } catch (err) { showStatus('Import gagal: ' + err.message, true) }
         e.target.value = ''
     })
@@ -358,7 +374,11 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.textContent = '...'
             btn.disabled    = true
             try {
-                const res    = await fetch('/api/image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url }) })
+                const res    = await fetch('/api/image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                })
                 const result = await res.json()
                 if (result.error) throw new Error(result.error)
                 input.value = result.url
@@ -370,19 +390,19 @@ document.addEventListener('DOMContentLoaded', () => {
     })
 
     // ── Init ───────────────────────────────────────────────────
-    const init = async () => {
-        await loadProfiles()
-        try {
-            const res    = await fetch('/api/profiles/last')
-            const { name } = await res.json()
-            if (name && profileSelect.querySelector(`option[value="${CSS.escape(name)}"]`)) {
-                profileSelect.value = name
-                const profiles = await (await fetch('/api/profiles')).json()
-                if (profiles[name]) fillForm(profiles[name])
+    const init = () => {
+        loadProfiles()
+        const last = lsGetLast()
+        if (last) {
+            const profiles = lsGetProfiles()
+            if (profiles[last] && profileSelect.querySelector(`option[value="${CSS.escape(last)}"]`)) {
+                profileSelect.value = last
+                fillForm(profiles[last])
             }
-        } catch {}
+        }
         updatePreview()
     }
 
     init()
 })
+
